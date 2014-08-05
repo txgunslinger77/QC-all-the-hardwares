@@ -3,7 +3,7 @@
 # USAGE:
 # ./script.sh [MGMT Subnet address]
 
-# TODO: Sanatize script so that it can be run repeatedly without anything breaking.
+# TODO: Sanitize script so that it can be run repeatedly without anything breaking.
 
 
 bdf_sort () {
