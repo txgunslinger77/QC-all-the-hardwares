@@ -5,6 +5,56 @@
 
 # TODO: Sanatize script so that it can be run repeatedly without anything breaking.
 
+args=($@)
+
+usage () {
+	echo Full usage in coming days
+}
+
+parameters () {
+	# TODO - Validate ip address in case statement 
+	# TODO - Other arguments needed?
+	# Parse shell script parameters
+	# We use "false" instead of a boolean for readability
+	for arg in "${args[@]}"; do
+
+	case "${arg}" in
+	"") 
+		usage
+		exit 1
+		;;
+	--without-networking|-n)
+		networking="false"
+		;;
+	--without-resize-swap|-r)
+		resize_swap="false"
+		;;
+	--without-system-upgrade|-u)
+		system_upgrade="false"
+		;;
+	--without-kernel-upgrade|-k)
+		kernel_upgrade="false"
+		;;
+	--without-dell-om|-d)
+		dell_om="false"
+		;;
+	--without-serail-setup|-s)
+		sol="false"
+		;;
+	--no-restart)
+		restart_node="false"
+		;;
+	[0-9].*)
+		MGMT_SUBNET="${arg}"
+		;;
+	*)
+		echo "Unknown argument ${arg}"
+		usage
+		exit 1
+		;;
+	esac
+	done
+}
 
 bdf_sort () {
 	# This sorts by using some sed magic. It view groups as lines with breaks in between them. It uses "vertical tabs" to allow sorting. This only sorts based on the first line in each group. See Sam Yaple if it needs to sort by a line other than the first one.
@@ -82,6 +132,10 @@ EOF
 }
 
 networking () {
+	if [[ "${networking}" == "false" ]]; then
+		return 0
+	fi
+
 	hosts_fix
 
 	udev_fix
@@ -91,6 +145,10 @@ networking () {
 
 volumes () { 
 	# Resize any swap disks larger than 8GB to 8GB - TODO Run only if 8G > swap00 > 7G, possibly check boot size as well
+	if [[ "${resize_swap}" == "false" ]]; then
+		return 0
+	fi
+
 	swapoff /dev/mapper/vglocal00-swap00
 	lvresize -f -L8G /dev/vglocal00/swap00
 	mkswap /dev/mapper/vglocal00-swap00
@@ -101,6 +159,10 @@ volumes () {
 
 modules () {
 	# Un-blacklist Modules - Line will only modify file if file exists and blacklist e1000e or blacklist ixgbe exists at the beginning of a line.
+	if [[ "${modules}" == "false" ]]; then
+		return 0
+	fi
+
 	BLACKLIST="/etc/modprobe.d/blacklist.local.conf"
 	if [ -a "${BLACKLIST}" ]; then
 		sed -i 's/^blacklist e1000e/#blacklist e1000e/g' "${BLACKLIST}"
@@ -121,7 +183,12 @@ modules () {
 sol () { 
 	# Create file to configure console serial redirection over DRAC
 	# (this will allow you to access DRAC from your terminal session window)
+	if [[ "${sol}" == "false" ]]; then
+		return 0
+	fi
+	
 	cat << EOF > /etc/init/ttyS0.conf
+
 # ttyS0 - getty
 #
 # This service maintains a getty on ttyS0 from the point the system is
@@ -155,11 +222,20 @@ EOF
  
 update_kernel () {
 	# TODO: Wrap these updates into functions so that if a certain parameter is passed it will skip updating the system.
+	if [[ "$i{upgrade_kernel}" == "false" ]]; then
+		return 0
+	fi
+	
+
 	# Update kernel from 3.2 > 3.8
 	apt-get-update && apt-get install -y --install-recommends linux-generic-lts-raring
 }
 
 update_os () {
+	if [[ "$i{upgrade_os}" == "false" ]]; then
+		return 0
+	fi
+
 	# Ensure necessary packages are installed and up to date, and install Dell OpenManage for Ubuntu
 	apt-get update && apt-get -y dist-upgrade
 }
@@ -170,6 +246,10 @@ install_tools () {
 }
 
 install_dell_om () {
+	if [[ "$i{dell_om}" == "false" ]]; then
+		return 0
+	fi
+	
 	echo 'deb http://linux.dell.com/repo/community/deb/latest /' > /etc/apt/sources.list.d/linux.dell.com.list
 	gpg --keyserver pool.sks-keyservers.net --recv-key 1285491434D8786F
 	gpg -a --export 1285491434D8786F | sudo apt-key add -
@@ -184,6 +264,17 @@ install_dell_om () {
 	sleep 10
 }
 
+restart_node () {
+	# Only restart if needed unless specifically told not to restart
+	if [[ "$i{restart_node}" == "false" ]]; then
+		return 0
+	fi
+
+	if [[ "$i{restart_needed}" == "true" ]]; then
+		reboot
+	fi
+}
+
 networking
 volumes
 modules
@@ -193,7 +284,6 @@ install_tools
 install_dell_om
 sol
 
-# Apply kernel update with reboot
-reboot
+restart_node
 
 exit
