@@ -9,11 +9,12 @@
 
 networking="true"
 resize_swap="false"
-system_upgrade="true"
-kernel_upgrade="false"
+upgrade_os="true"
+upgrade_kernel="false"
 dell_om="true"
 sol="true"
 restart_node="false"
+modules="true"
 MGMT_SUBNET="10.240.0.0/22"
 
 OMCONFIG_BIN="/opt/dell/srvadmin/bin/omconfig"
@@ -71,6 +72,9 @@ parameters () {
 		usage
 		exit 1
 		;;
+	--without-modules|-m)
+		modules="false"
+		;;
 	--without-networking|-n)
 		networking="false"
 		;;
@@ -78,10 +82,10 @@ parameters () {
 		resize_swap="true"
 		;;
 	--without-system-upgrade|-u)
-		system_upgrade="false"
+		upgrade_os="false"
 		;;
 	--kernel-upgrade|-k)
-		kernel_upgrade="true"
+		upgrade_kernel="true"
 		;;
 	--without-dell-om|-d)
 		dell_om="false"
