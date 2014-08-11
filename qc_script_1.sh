@@ -263,7 +263,6 @@ sol () {
 	RACADM_BIN="/opt/dell/srvadmin/bin/omconfig"
 	
 	cat << EOF > /etc/init/ttyS0.conf
-
 # ttyS0 - getty
 #
 # This service maintains a getty on ttyS0 from the point the system is
@@ -283,12 +282,14 @@ EOF
 	start ttyS0
 
 	# Apply BIOS changes to allow console serial redirection over DRAC
+
 	"${OMCONFIG_BIN}" chassis biossetup attribute=extserial setting=rad
 	"${OMCONFIG_BIN}" chassis biossetup attribute=fbr setting=115200
 	"${OMCONFIG_BIN}" chassis biossetup attribute=serialcom setting=com2
 	"${OMCONFIG_BIN}" chassis biossetup attribute=crab setting=enabled
  
 	# Apply DRAC settings to allow console serial redirection over DRAC
+
 	"${RACADM_BIN}" config -g cfgSerial -o cfgSerialBaudRate 115200
 	"${RACADM_BIN}" config -g cfgSerial -o cfgSerialConsoleEnable 1
 	"${RACADM_BIN}" config -g cfgSerial -o cfgSerialSshEnable 1
@@ -304,27 +305,36 @@ update_kernel () {
 	fi
 
 	# Update kernel from 3.2 > 3.8
+
 	apt-get-update
 	apt-get install -y --install-recommends linux-generic-lts-raring
 }
 
 update_os () {
-	if [[ "$i{upgrade_os}" == "false" ]]; then
+	if [[ "${upgrade_os}" == "false" ]]; then
 		return 0
 	fi
 
 	# Ensure necessary packages are installed and up to date
+
 	apt-get update && apt-get -y dist-upgrade
 }
 
 install_tools () {
+	# TODO: Should we still allow this even if we don't upgrade OS?
+	# I think yes
+
+	if [[ "${upgrade_os}" == "false" ]]; then
+		return 0
+	fi
+
 	apt-get update && apt-get install -y dsh curl ethtool ifenslave vim \
 							sysstat linux-crashdump
 	sed -i 's/ENABLED=\"false\"/ENABLED=\"true\"/' /etc/default/sysstat
 }
 
 install_dell_om () {
-	if [[ "$i{dell_om}" == "false" ]]; then
+	if [[ "${dell_om}" == "false" ]]; then
 		return 0
 	fi
 	
@@ -342,6 +352,9 @@ install_dell_om () {
 	"${OMCONFIG_BIN}" chassis biossetup attribute=SysProfile \
 							setting=PerfOptimized
 	sleep 10
+
+	# Serial console setup
+	sol
 }
 
 restart_node () {
@@ -364,7 +377,6 @@ update_kernel
 update_os
 install_tools
 install_dell_om
-sol
 
 restart_node
 
