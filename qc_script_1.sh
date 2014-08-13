@@ -212,8 +212,8 @@ hosts_fix () {
 	cp "${HOSTS}" "${HOSTS_BAK}"
 
 	cat << EOF > "${HOSTS}"
-127.0.0.1\tlocalhost.localdomain localhost
-${ADDRESS}\t${FQDN} ${HOST}
+127.0.0.1	localhost.localdomain localhost
+${ADDRESS}	${FQDN} ${HOST}
 EOF
 	
 	echo "${HOST}" > /etc/hostname
@@ -293,9 +293,9 @@ sol () {
 # started until it is shut down again.
 
 start on runlevel [2345] and (
-\tnot-container or
-\tcontainer CONTAINER=lxc or
-\tcontainer CONTAINER=lxc-libvirt)
+	not-container or
+	container CONTAINER=lxc or
+	container CONTAINER=lxc-libvirt)
  
 stop on runlevel [!2345]
   
