@@ -198,7 +198,7 @@ hosts_fix () {
 	HOSTS_BAK="/root/hosts.bak"
 	HOST="$(echo ${RS_SERVER_NAME} | awk -F. '{print $1}')"
 	FQDN="${RS_SERVER_NAME}"
-	MGMT_SUBNET="$(echo ${1:-10.240.0.0} | awk -F. {print $1"."$2})"
+	MGMT_SUBNET="$(echo ${1:-10.240.0.0} | awk -F. '{print $1"."$2}')"
 	ADDRESS=$(ip a | awk '/inet '"${MGMT_SUBNET}"'/ \
 				{sub(/\/[0-9]+$/, "", $2); print $2; exit}')
 
