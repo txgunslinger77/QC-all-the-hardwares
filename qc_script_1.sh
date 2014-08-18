@@ -199,11 +199,11 @@ hosts_fix () {
 	HOST="$(echo ${RS_SERVER_NAME} | awk -F. '{print $1}')"
 	FQDN="${RS_SERVER_NAME}"
 	MGMT_SUBNET="$(echo ${1:-10.240.0.0} | awk -F. {print $1"."$2})"
-	ADDRESS=$(ip a | awk '/inet "${MGMT_SUBNET}"/ \
+	ADDRESS=$(ip a | awk '/inet '"${MGMT_SUBNET}"'/ \
 				{sub(/\/[0-9]+$/, "", $2); print $2; exit}')
 
 	if [[ -z "${ADDRESS}" ]]; then
-		ADDRESS=$(ip a | awk '/inet/ {sub(/\/[0-9]+$/, "", $2); \
+		ADDRESS=$(ip a | awk '/inet 10/ {sub(/\/[0-9]+$/, "", $2); \
 							print $2; exit}')
 		echo "Failed to get management ip address. Assuming \
 					${ADDRESS} is the management ip"
@@ -284,7 +284,7 @@ sol () {
 	fi
 
 	OMCONFIG_BIN="/opt/dell/srvadmin/bin/omconfig"
-	RACADM_BIN="/opt/dell/srvadmin/bin/omconfig"
+	RACADM_BIN="/opt/dell/srvadmin/sbin/racadm"
 	
 	cat << EOF > /etc/init/ttyS0.conf
 # ttyS0 - getty
@@ -330,7 +330,7 @@ update_kernel () {
 
 	# Update kernel from 3.2 > 3.8
 
-	apt-get-update
+	apt-get update
 	apt-get install -y --install-recommends linux-generic-lts-raring
 }
 
@@ -372,7 +372,8 @@ install_dell_om () {
 	# Give OpenManage services chance to start
 	sleep 35
 
-	# Enable the performance profile in the BIOS
+	# Enable the HT and performance profile in the BIOS
+	"${OMCONFIG_BIN}" chassis biossetup attribute=cpuht setting=enabled
 	"${OMCONFIG_BIN}" chassis biossetup attribute=SysProfile \
 							setting=PerfOptimized
 	sleep 10
