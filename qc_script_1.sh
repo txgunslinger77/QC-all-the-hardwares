@@ -217,20 +217,20 @@ EOF
 	"${RACADM_BIN}" config -g cfgSerial -o cfgSerialHistorySize 2000
 }
  
-update_kernel () {
+kernel_update () {
 	# Update kernel from 3.2 > 3.8
 
 	apt-get update
 	apt-get install -y --install-recommends linux-generic-lts-raring
 }
 
-update_distro () {
+distro_update () {
 	# Ensure necessary packages are installed and up to date
 
 	apt-get update && apt-get -y dist-upgrade
 }
 
-install_tools () {
+tools_install () {
 	# TODO: Should we still allow this even if we don't upgrade OS?
 	# I think yes
 
@@ -239,7 +239,11 @@ install_tools () {
 	sed -i 's/ENABLED=\"false\"/ENABLED=\"true\"/' /etc/default/sysstat
 }
 
-install_dell_om () {
+dell_om_install () {
+
+	# Install basic system tools
+	tools_install
+
 	# The precise repo has been show to work on trusty. The 740 ensures it is v7.4
 	echo 'deb http://linux.dell.com/repo/community/ubuntu precise openmange/740' \
 				> /etc/apt/sources.list.d/linux.dell.com.list
@@ -290,7 +294,7 @@ while getopts ":dkmnorh" opt; do
 		networking=1
 		;;
 	o)
-		dell_om=1
+		dell_om_install=1
 		;;
 	r)
 		lvm_resize=1
@@ -310,10 +314,10 @@ done
 [[ "${networking}" -eq 1 ]] && networking
 [[ "${volumes}" -eq 1 ]] && volumes
 [[ "${modules}" -eq 1 ]] && modules
-[[ "${update_kernel}" -eq 1 ]] && update_kernel
-[[ "${update_distro}" -eq 1 ]] && update_os
-[[ "${install_tools}" -eq 1 ]] && install_tools
-[[ "${install_dell_om}" -eq 1 ]] && install_dell_om
+[[ "${kernel_update}" -eq 1 ]] && kernel_update
+[[ "${distro_update}" -eq 1 ]] && distro_update
+[[ "${tools_install}" -eq 1 ]] && tools_install
+[[ "${dell_om_install}" -eq 1 ]] && dell_om_install
 
 [[ "${restart}" -eq 1 ]] && restart_node
 
