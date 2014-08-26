@@ -20,39 +20,22 @@
 #
 #          ALL THE HARDWARES
 
-# USAGE:
-# ./qc.sh [options] [MGMT Subnet address]
-
-# TODO: Sanitize script so that it can be run repeatedly
-
-###Default Params, overriden by cli options passed
-
-networking="true"
-resize_swap="false"
-upgrade_os="true"
-upgrade_kernel="false"
-dell_om="true"
-sol="true"
-restart_node="false"
-modules="true"
 MGMT_SUBNET="10.240.0.0/22"
 
 OMCONFIG_BIN="/opt/dell/srvadmin/bin/omconfig"
 RACADM_BIN="/opt/dell/srvadmin/bin/omconfig"
 
-args=($@)
-
-usage () {
+usage () {dkmnorh
 	cat << EOF
 Usage: qc [ OPTIONS ] [ MGMT_IP ]
 where OPTIONS := {
-			--without-networking, -n
-			--resize-swap, -r
-			--without-system-upgrade, -u
-			--kernel-upgrade, -k
-			--without-dell-om, -d
-			--without-serail-setup, -s
-			--no-restart
+			-d, Distro Update
+			-k, Kernel Update
+			-m, /etc/modules inserts
+			-n, networking -- fix it all
+			-o, Dell OpenManage tools
+			-r, Resize swap (for preseed problems)
+			-h, HELP! IM TRAPPED IN A SCRIPT FACTORY!
 		}
 
 examples:
@@ -65,48 +48,6 @@ examples:
 	Partial Install with garunteed no restart
 		./qc --no-restart
 EOF
-}
-
-parameters () {
-	# Parse shell script parameters
-	# We use "false" instead of a boolean for readability
-
-	while getopts ":afhrt" opt; do
-		case "$opt" in
-		d)
-			distro_update=1
-			;;
-		k)
-			kernel_update=1
-			;;
-		m)
-			modules=1
-			;;
-		n)
-			networking=1
-			;;
-		o)
-			dell_om=1
-			;;
-		r)
-			lvm_resize=1
-			;;
-
-		s)
-			sol=1
-			;;
-
-		h)
-			usage
-			exit 0
-			;;
-		\?)
-			echo "Invalid option: -$OPTARG" >&2
-			usage
-			exit 1
-			;;
-		esac
-	done
 }
 
 bdf_sort () {
@@ -334,7 +275,47 @@ restart_node () {
 	reboot
 }
 
-parameters
+
+###############################################################################
+#
+#				Main
+#
+###############################################################################
+
+# Parse shell script parameters
+# We use "false" instead of a boolean for readability
+
+while getopts ":dkmnorh" opt; do
+	case "$opt" in
+	d)
+		distro_update=1
+		;;
+	k)
+		kernel_update=1
+		;;
+	m)
+		modules=1
+		;;
+	n)
+		networking=1
+		;;
+	o)
+		dell_om=1
+		;;
+	r)
+		lvm_resize=1
+		;;
+	h)
+		usage
+		exit 0
+		;;
+	\?)
+		echo "Invalid option: -$OPTARG" >&2
+		usage
+		exit 1
+		;;
+	esac
+done
 
 [[ "${networking}" -eq 1 ]] && networking
 [[ "${volumes}" -eq 1 ]] && volumes
