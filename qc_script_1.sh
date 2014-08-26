@@ -25,9 +25,9 @@ MGMT_SUBNET="10.240.0.0/22"
 OMCONFIG_BIN="/opt/dell/srvadmin/bin/omconfig"
 RACADM_BIN="/opt/dell/srvadmin/bin/omconfig"
 
-usage () {dkmnorh
+usage () {
 	cat << EOF
-Usage: qc [ OPTIONS ] [ MGMT_IP ]
+Usage: qc [ OPTIONS ]
 where OPTIONS := {
 			-d, Distro Update
 			-k, Kernel Update
@@ -37,16 +37,6 @@ where OPTIONS := {
 			-r, Resize swap (for preseed problems)
 			-h, HELP! IM TRAPPED IN A SCRIPT FACTORY!
 		}
-
-examples:
-	Full Install
-		./qc -r -k
-
-	Full Install with uncommon MGMT
-		./qc -r -k 10.12.0.0/21
-
-	Partial Install with garunteed no restart
-		./qc --no-restart
 EOF
 }
 
