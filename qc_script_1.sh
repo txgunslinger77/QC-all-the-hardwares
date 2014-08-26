@@ -245,7 +245,7 @@ dell_om_install () {
 	tools_install
 
 	# The precise repo has been show to work on trusty. The 740 ensures it is v7.4
-	echo 'deb http://linux.dell.com/repo/community/ubuntu precise openmange/740' \
+	echo 'deb http://linux.dell.com/repo/community/ubuntu precise openmanage/740' \
 				> /etc/apt/sources.list.d/linux.dell.com.list
 	gpg --keyserver pool.sks-keyservers.net --recv-key 1285491434D8786F
 	gpg -a --export 1285491434D8786F | sudo apt-key add -
