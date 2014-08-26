@@ -68,64 +68,44 @@ EOF
 }
 
 parameters () {
-	# TODO - Validate ip address better. Maybe. Its not really a priority
-	# since if we don't find a valid interface we will search for another
-	# one anyway. Also, only the first two octets matter currently
-	
-	# TODO - Other arguments needed?
-
 	# Parse shell script parameters
 	# We use "false" instead of a boolean for readability
-	# We don't use getop/s because I have always hated them
-	# and I see no need in this scenario
 
-	for arg in "${args[@]}"; do
+	while getopts ":afhrt" opt; do
+		case "$opt" in
+		d)
+			distro_update=1
+			;;
+		k)
+			kernel_update=1
+			;;
+		m)
+			modules=1
+			;;
+		n)
+			networking=1
+			;;
+		o)
+			dell_om=1
+			;;
+		r)
+			lvm_resize=1
+			;;
 
-	if [[ "${arg}" =~ ^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.*$ ]]; \
-									   then
-		MGMT_SUBNET="${arg}"
-		continue
-	fi
+		s)
+			sol=1
+			;;
 
-	case "${arg}" in
-	"") 
-		usage
-		exit 1
-		;;
-	--without-modules|-m)
-		modules="false"
-		;;
-	--without-networking|-n)
-		networking="false"
-		;;
-	--resize-swap|-r)
-		resize_swap="true"
-		;;
-	--without-system-upgrade|-u)
-		upgrade_os="false"
-		;;
-	--kernel-upgrade|-k)
-		upgrade_kernel="true"
-		;;
-	--without-dell-om|-d)
-		dell_om="false"
-		;;
-	--without-serail-setup|-s)
-		sol="false"
-		;;
-	--no-restart)
-		restart_node="false"
-		;;
-	--help|-h)
-		usage
-		exit 0
-		;;
-	*)
-		echo "Unknown argument ${arg}"
-		usage
-		exit 1
-		;;
-	esac
+		h)
+			usage
+			exit 0
+			;;
+		\?)
+			echo "Invalid option: -$OPTARG" >&2
+			usage
+			exit 1
+			;;
+		esac
 	done
 }
 
@@ -221,10 +201,6 @@ EOF
 }
 
 networking () {
-	if [[ "${networking}" == "false" ]]; then
-		return 0
-	fi
-
 	hosts_fix
 
 	udev_fix
@@ -233,12 +209,8 @@ networking () {
 }
 
 volumes () { 
-	# Resize any swap disks larger than 8GB to 8GB - TODO Run only if \
-	# 8G => swap00 > 7G, possibly check boot size as well
-
-	if [[ "${resize_swap}" == "false" ]]; then
-		return 0
-	fi
+	# Resize any swap disks larger than 8GB to 8GB
+	# TODO Run only if swap00 > 7G
 
 	swapoff /dev/mapper/vglocal00-swap00
 	lvresize -f -L8G /dev/vglocal00/swap00
@@ -253,10 +225,6 @@ modules () {
 	# and blacklist e1000e or blacklist ixgbe exists at the beginning \ 
 	# of a line.
 
-	if [[ "${modules}" == "false" ]]; then
-		return 0
-	fi
-
 	BLACKLIST="/etc/modprobe.d/blacklist.local.conf"
 	if [ -a "${BLACKLIST}" ]; then
 		sed -i 's/^blacklist e1000e/#blacklist e1000e/g' "${BLACKLIST}"
@@ -265,7 +233,7 @@ modules () {
 	 
 	# TODO (Thomas M. / Charles F.): Need to upgrade ixgbe version here
 	# Add bonding and NIC modules to /etc/modules file
-	# We only need to add these lines if they don't exist. No need to add \
+	# We only need to add these lines if they don't exist. No need to add
 	# them repeatedly if the script is rerun
 
 	MODULES="/etc/modules"
@@ -279,10 +247,8 @@ modules () {
 sol () { 
 	# Create file to configure console serial redirection over DRAC
 	# (this will allow access to DRAC from your terminal session window)
-	if [[ "${sol}" == "false" ]]; then
-		return 0
-	fi
 
+	# This is set manually since it doesn't exist in $PATH sometimes
 	OMCONFIG_BIN="/opt/dell/srvadmin/bin/omconfig"
 	RACADM_BIN="/opt/dell/srvadmin/sbin/racadm"
 	
@@ -321,24 +287,13 @@ EOF
 }
  
 update_kernel () {
-	# TODO: Wrap these updates into functions so that if a certain
-	# parameter is passed it will skip updating the system.
-
-	if [[ "${upgrade_kernel}" == "false" ]]; then
-		return 0
-	fi
-
 	# Update kernel from 3.2 > 3.8
 
 	apt-get update
 	apt-get install -y --install-recommends linux-generic-lts-raring
 }
 
-update_os () {
-	if [[ "${upgrade_os}" == "false" ]]; then
-		return 0
-	fi
-
+update_distro () {
 	# Ensure necessary packages are installed and up to date
 
 	apt-get update && apt-get -y dist-upgrade
@@ -348,20 +303,13 @@ install_tools () {
 	# TODO: Should we still allow this even if we don't upgrade OS?
 	# I think yes
 
-	if [[ "${upgrade_os}" == "false" ]]; then
-		return 0
-	fi
-
 	apt-get update && apt-get install -y dsh curl ethtool ifenslave vim \
 							sysstat linux-crashdump
 	sed -i 's/ENABLED=\"false\"/ENABLED=\"true\"/' /etc/default/sysstat
 }
 
 install_dell_om () {
-	if [[ "${dell_om}" == "false" ]]; then
-		return 0
-	fi
-	
+	# The precise repo has been show to work on trusty. The 740 ensures it is v7.4
 	echo 'deb http://linux.dell.com/repo/community/ubuntu precise openmange/740' \
 				> /etc/apt/sources.list.d/linux.dell.com.list
 	gpg --keyserver pool.sks-keyservers.net --recv-key 1285491434D8786F
@@ -383,26 +331,19 @@ install_dell_om () {
 }
 
 restart_node () {
-	# Only restart if needed unless specifically told not to restart
-	if [[ "${restart_node}" == "false" ]]; then
-		return 0
-	fi
-
-	if [[ "${restart_needed}" == "true" ]]; then
-		reboot
-	fi
+	reboot
 }
 
 parameters
 
-networking
-volumes
-modules
-update_kernel
-update_os
-install_tools
-install_dell_om
+[[ "${networking}" -eq 1 ]] && networking
+[[ "${volumes}" -eq 1 ]] && volumes
+[[ "${modules}" -eq 1 ]] && modules
+[[ "${update_kernel}" -eq 1 ]] && update_kernel
+[[ "${update_distro}" -eq 1 ]] && update_os
+[[ "${install_tools}" -eq 1 ]] && install_tools
+[[ "${install_dell_om}" -eq 1 ]] && install_dell_om
 
-restart_node
+[[ "${restart}" -eq 1 ]] && restart_node
 
 exit
