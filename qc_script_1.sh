@@ -255,8 +255,10 @@ dell_om_install () {
 	# Give OpenManage services chance to start
 	sleep 35
 
-	# Enable the HT and performance profile in the BIOS
+	# Enable the HT in the BIOS
 	"${OMCONFIG_BIN}" chassis biossetup attribute=cpuht setting=enabled
+
+	# Enable performance profile, this fails on R710s "with unknown attribute"
 	"${OMCONFIG_BIN}" chassis biossetup attribute=SysProfile \
 							setting=PerfOptimized
 	sleep 10
