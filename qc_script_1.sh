@@ -20,8 +20,6 @@
 #
 #          ALL THE HARDWARES
 
-MGMT_SUBNET="10.240.0.0/22"
-
 OMCONFIG_BIN="/opt/dell/srvadmin/bin/omconfig"
 RACADM_BIN="/opt/dell/srvadmin/bin/omconfig"
 
@@ -32,9 +30,11 @@ where OPTIONS := {
 			-d, Distro Update
 			-k, Kernel Update
 			-m, /etc/modules inserts
-			-n, networking -- fix it all
+			-n, networking -- fix it all (BROKEN)
 			-o, Dell OpenManage tools
 			-r, Resize swap (for preseed problems)
+			-s, Serial console setup
+			-t, Standard system tools
 			-h, HELP! IM TRAPPED IN A SCRIPT FACTORY!
 		}
 EOF
@@ -139,21 +139,26 @@ networking () {
 	interfaces_fix
 }
 
-volumes () { 
-	# Resize any swap disks larger than 8GB to 8GB
-	# TODO Run only if swap00 > 7G
+lvm_resize () { 
+	# Resize swap disk larger than 8GB to 8GB
 
-	swapoff /dev/mapper/vglocal00-swap00
-	lvresize -f -L8G /dev/vglocal00/swap00
-	mkswap /dev/mapper/vglocal00-swap00
-	swapon -a
-	lvresize -l+100%FREE /dev/mapper/vglocal00-root00
-	resize2fs /dev/mapper/vglocal00-root00 
+	# This returns number of sectors
+	swap_size=$(lvdisplay vglocal00/swap00 -c | awk -F: '{print $7}')
+
+	# 8GiB / 512 byte sectors = 16777216 sectors
+	if [[ "${swap_size}" -gt 16777216 ]]; then
+		swapoff /dev/mapper/vglocal00-swap00
+		lvresize -f -L8G /dev/vglocal00/swap00
+		mkswap /dev/mapper/vglocal00-swap00
+		swapon -a
+		lvresize -l+100%FREE /dev/mapper/vglocal00-root00
+		resize2fs /dev/mapper/vglocal00-root00
+	fi
 }
 
 modules () {
-	# Un-blacklist Modules - Line will only modify file if file exists \
-	# and blacklist e1000e or blacklist ixgbe exists at the beginning \ 
+	# Un-blacklist Modules - Line will only modify file if file exists
+	# and blacklist e1000e or blacklist ixgbe exists at the beginning 
 	# of a line.
 
 	BLACKLIST="/etc/modprobe.d/blacklist.local.conf"
@@ -162,7 +167,6 @@ modules () {
 		sed -i 's/^blacklist ixgbe/#blacklist ixgbe/g' "${BLACKLIST}"
 	fi
 	 
-	# TODO (Thomas M. / Charles F.): Need to upgrade ixgbe version here
 	# Add bonding and NIC modules to /etc/modules file
 	# We only need to add these lines if they don't exist. No need to add
 	# them repeatedly if the script is rerun
@@ -231,8 +235,7 @@ distro_update () {
 }
 
 tools_install () {
-	# TODO: Should we still allow this even if we don't upgrade OS?
-	# I think yes
+	# Setup basic tools
 
 	apt-get update && apt-get install -y dsh curl ethtool ifenslave vim \
 							sysstat linux-crashdump
@@ -240,9 +243,7 @@ tools_install () {
 }
 
 dell_om_install () {
-
-	# Install basic system tools
-	tools_install
+	# Install OpenManage 7.4 from dell
 
 	# The precise repo has been show to work on trusty. The 740 ensures it is v7.4
 	echo 'deb http://linux.dell.com/repo/community/ubuntu precise openmanage/740' \
@@ -262,9 +263,6 @@ dell_om_install () {
 	"${OMCONFIG_BIN}" chassis biossetup attribute=SysProfile \
 							setting=PerfOptimized
 	sleep 10
-
-	# Serial console setup
-	sol
 }
 
 restart_node () {
@@ -279,9 +277,8 @@ restart_node () {
 ###############################################################################
 
 # Parse shell script parameters
-# We use "false" instead of a boolean for readability
 
-while getopts ":dkmnorh" opt; do
+while getopts ":dkmnorsth" opt; do
 	case "$opt" in
 	d)
 		distro_update=1
@@ -301,6 +298,12 @@ while getopts ":dkmnorh" opt; do
 	r)
 		lvm_resize=1
 		;;
+	s)
+		sol=1
+		;;
+	t)
+		tools_install=1
+		;;
 	h)
 		usage
 		exit 0
@@ -313,13 +316,14 @@ while getopts ":dkmnorh" opt; do
 	esac
 done
 
-[[ "${networking}" -eq 1 ]] && networking
-[[ "${volumes}" -eq 1 ]] && volumes
+#[[ "${networking}" -eq 1 ]] && networking
+[[ "${lvm_resize}" -eq 1 ]] && lvm_resize
 [[ "${modules}" -eq 1 ]] && modules
+[[ "${dell_om_install}" -eq 1 ]] && dell_om_install
+[[ "${sol}" -eq 1 ]] && sol
 [[ "${kernel_update}" -eq 1 ]] && kernel_update
 [[ "${distro_update}" -eq 1 ]] && distro_update
 [[ "${tools_install}" -eq 1 ]] && tools_install
-[[ "${dell_om_install}" -eq 1 ]] && dell_om_install
 
 [[ "${restart}" -eq 1 ]] && restart_node
 
