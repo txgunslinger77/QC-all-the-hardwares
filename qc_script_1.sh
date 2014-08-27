@@ -21,7 +21,7 @@
 #          ALL THE HARDWARES
 
 OMCONFIG_BIN="/opt/dell/srvadmin/bin/omconfig"
-RACADM_BIN="/opt/dell/srvadmin/bin/omconfig"
+RACADM_BIN="/opt/dell/srvadmin/sbin/racadm"
 
 usage () {
 	cat << EOF
@@ -145,14 +145,20 @@ lvm_resize () {
 	# This returns number of sectors
 	swap_size=$(lvdisplay vglocal00/swap00 -c | awk -F: '{print $7}')
 
+	echo "Swap is currently ${swap_size}"
+
 	# 8GiB / 512 byte sectors = 16777216 sectors
 	if [[ "${swap_size}" -gt 16777216 ]]; then
+		echo "Swap is going to resize"
 		swapoff /dev/mapper/vglocal00-swap00
 		lvresize -f -L8G /dev/vglocal00/swap00
 		mkswap /dev/mapper/vglocal00-swap00
 		swapon -a
 		lvresize -l+100%FREE /dev/mapper/vglocal00-root00
 		resize2fs /dev/mapper/vglocal00-root00
+		echo "Swap is now ${swap_size}"
+	else
+		echo "Swap is not resizing"
 	fi
 }
 
@@ -162,32 +168,42 @@ modules () {
 	# of a line.
 
 	BLACKLIST="/etc/modprobe.d/blacklist.local.conf"
+	echo "Removing blacklisted modules from ${BLACKLIST} if they exist"
 	if [ -a "${BLACKLIST}" ]; then
 		sed -i 's/^blacklist e1000e/#blacklist e1000e/g' "${BLACKLIST}"
 		sed -i 's/^blacklist ixgbe/#blacklist ixgbe/g' "${BLACKLIST}"
 	fi
-	 
+ 
 	# Add bonding and NIC modules to /etc/modules file
 	# We only need to add these lines if they don't exist. No need to add
 	# them repeatedly if the script is rerun
 
 	MODULES="/etc/modules"
-	grep -q '^bonding$' "${MODULES}" || echo 'bonding' >> "${MODULES}"
-	grep -q '^e1000e$' "${MODULES}" || echo 'e1000e' >> "${MODULES}"
-	grep -q '^ixgbe$' "${MODULES}" || echo 'ixgbe' >> "${MODULES}"
+	echo "Inserting 'bonding' module into ${MODULES}"
+	grep -q '^bonding$' "${MODULES}" && echo "'bonding' found in ${MODULES}" \
+					|| echo 'bonding' >> "${MODULES}"
+
+	echo "Inserting 'e1000e' module into ${MODULES}"
+	grep -q '^e1000e$' "${MODULES}" && echo "'e1000e' found in ${MODULES}" \
+					|| echo 'e1000e' >> "${MODULES}"
+
+	echo "Inserting 'ixgbe' module into ${MODULES}"
+	grep -q '^ixgbe$' "${MODULES}" && echo "'ixgbe' found in ${MODULES}" \
+					|| echo 'ixgbe' >> "${MODULES}"
  
-	modprobe bonding; modprobe e1000e; modprobe ixgbe
+	modprobe bonding || echo "bonding module failed to load"
+	modprobe e1000e || echo "e1000e module failed to load"
+	modprobe ixgbe || echo "ixgbe module failed to load"
 }
 
 sol () { 
 	# Create file to configure console serial redirection over DRAC
 	# (this will allow access to DRAC from your terminal session window)
 
-	# This is set manually since it doesn't exist in $PATH sometimes
-	OMCONFIG_BIN="/opt/dell/srvadmin/bin/omconfig"
-	RACADM_BIN="/opt/dell/srvadmin/sbin/racadm"
-	
-	cat << EOF > /etc/init/ttyS0.conf
+	SOL_CONF="/etc/init/ttyS0.conf"
+
+	echo "Creating or overwriting ${SOL_CONF} to allow serial redirection"
+	cat << EOF > "${SOL_CONF}"
 # ttyS0 - getty
 #
 # This service maintains a getty on ttyS0 from the point the system is
@@ -206,15 +222,15 @@ EOF
  
 	start ttyS0
 
-	# Apply BIOS changes to allow console serial redirection over DRAC
+	echo "Configuring chassis for serial redirection"
 
+	# Apply BIOS changes to allow console serial redirection over DRAC
 	"${OMCONFIG_BIN}" chassis biossetup attribute=extserial setting=rad
 	"${OMCONFIG_BIN}" chassis biossetup attribute=fbr setting=115200
 	"${OMCONFIG_BIN}" chassis biossetup attribute=serialcom setting=com2
 	"${OMCONFIG_BIN}" chassis biossetup attribute=crab setting=enabled
  
 	# Apply DRAC settings to allow console serial redirection over DRAC
-
 	"${RACADM_BIN}" config -g cfgSerial -o cfgSerialBaudRate 115200
 	"${RACADM_BIN}" config -g cfgSerial -o cfgSerialConsoleEnable 1
 	"${RACADM_BIN}" config -g cfgSerial -o cfgSerialSshEnable 1
@@ -224,6 +240,8 @@ EOF
 kernel_update () {
 	# Update kernel from 3.2 > 3.8
 
+	echo "Current kernel version: $(uname -r)"
+	echo "Attempting to install newer kernel..."
 	apt-get update
 	apt-get install -y --install-recommends linux-generic-lts-raring
 }
@@ -231,34 +249,42 @@ kernel_update () {
 distro_update () {
 	# Ensure necessary packages are installed and up to date
 
-	apt-get update && apt-get -y dist-upgrade
+	echo "Installing any Distro upgrades that are available"
+	apt-get update
+	apt-get -y dist-upgrade
 }
 
 tools_install () {
 	# Setup basic tools
 
-	apt-get update && apt-get install -y dsh curl ethtool ifenslave vim \
-							sysstat linux-crashdump
+	apt-get update
+	apt-get install -y dsh curl ethtool ifenslave vim sysstat linux-crashdump
 	sed -i 's/ENABLED=\"false\"/ENABLED=\"true\"/' /etc/default/sysstat
 }
 
 dell_om_install () {
 	# Install OpenManage 7.4 from dell
 
+	echo "Installing Dell OpenManage 7.4"
 	# The precise repo has been show to work on trusty. The 740 ensures it is v7.4
 	echo 'deb http://linux.dell.com/repo/community/ubuntu precise openmanage/740' \
 				> /etc/apt/sources.list.d/linux.dell.com.list
 	gpg --keyserver pool.sks-keyservers.net --recv-key 1285491434D8786F
 	gpg -a --export 1285491434D8786F | sudo apt-key add -
-	apt-get update && apt-get -y install srvadmin-all
+	apt-get update
+	apt-get -y install srvadmin-all
 	service dataeng start
 
 	# Give OpenManage services chance to start
 	sleep 35
 
+	echo "Enabling Hyperthreading..."
 	# Enable the HT in the BIOS
 	"${OMCONFIG_BIN}" chassis biossetup attribute=cpuht setting=enabled
 
+	# TODO: Check if node is R710 and don't run
+	echo "Enabling PerfOptimized to prevent phantom load issue"
+	echo "This will fail on R710 nodes, it is safe to ignore"
 	# Enable performance profile, this fails on R710s "with unknown attribute"
 	"${OMCONFIG_BIN}" chassis biossetup attribute=SysProfile \
 							setting=PerfOptimized
@@ -316,14 +342,17 @@ while getopts ":dkmnorsth" opt; do
 	esac
 done
 
+LOG_DIR="/home/rack/qc_logs"
+mkdir -p "${LOG_DIR}"
+
 #[[ "${networking}" -eq 1 ]] && networking
-[[ "${lvm_resize}" -eq 1 ]] && lvm_resize
-[[ "${modules}" -eq 1 ]] && modules
-[[ "${dell_om_install}" -eq 1 ]] && dell_om_install
-[[ "${sol}" -eq 1 ]] && sol
-[[ "${kernel_update}" -eq 1 ]] && kernel_update
-[[ "${distro_update}" -eq 1 ]] && distro_update
-[[ "${tools_install}" -eq 1 ]] && tools_install
+[[ "${lvm_resize}" -eq 1 ]] && lvm_resize 2>&1 > "${LOG_DIR}/lvm.log"
+[[ "${modules}" -eq 1 ]] && modules 2>&1 > "${LOG_DIR}/modules.log"
+[[ "${dell_om_install}" -eq 1 ]] && dell_om_install 2>&1 > "${LOG_DIR}/dell_openmanage.log"
+[[ "${sol}" -eq 1 ]] && sol 2>&1 > "${LOG_DIR}/serial.log"
+[[ "${kernel_update}" -eq 1 ]] && kernel_update 2>&1 > "${LOG_DIR}/kernel_update.log"
+[[ "${distro_update}" -eq 1 ]] && distro_update 2>&1 > "${LOG_DIR}/distro_update.log"
+[[ "${tools_install}" -eq 1 ]] && tools_install 2>&1 > "${LOG_DIR}/system_tools.log"
 
 [[ "${restart}" -eq 1 ]] && restart_node
 
