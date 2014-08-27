@@ -264,8 +264,9 @@ tools_install () {
 
 dell_om_install () {
 	# Install OpenManage 7.4 from dell
-
+	echo ###############################################################################
 	echo "Installing Dell OpenManage 7.4"
+	echo ###############################################################################
 	# The precise repo has been show to work on trusty. The 740 ensures it is v7.4
 	echo 'deb http://linux.dell.com/repo/community/ubuntu precise openmanage/740' \
 				> /etc/apt/sources.list.d/linux.dell.com.list
@@ -283,8 +284,10 @@ dell_om_install () {
 	"${OMCONFIG_BIN}" chassis biossetup attribute=cpuht setting=enabled
 
 	# TODO: Check if node is R710 and don't run
+	echo ###############################################################################	
 	echo "Enabling PerfOptimized to prevent phantom load issue"
 	echo "This will fail on R710 nodes, it is safe to ignore"
+	echo ###############################################################################
 	# Enable performance profile, this fails on R710s "with unknown attribute"
 	"${OMCONFIG_BIN}" chassis biossetup attribute=SysProfile \
 							setting=PerfOptimized
