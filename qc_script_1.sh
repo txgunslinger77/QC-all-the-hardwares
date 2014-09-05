@@ -236,7 +236,9 @@ respawn
 exec /sbin/getty -8 -L 115200 ttyS0 ansi
 EOF
  
-	start ttyS0
+	# TODO Check ttyS0 status first
+	# This will fail if it is already running.
+	start ttyS0 || true
 
 	echo "Configuring chassis for serial redirection"
 
@@ -364,10 +366,10 @@ while getopts ":dkmnorsth" opt; do
 done
 
 # Setting up the directory used for logging
-LOG_DIR="/home/rack/qc_logs_$(date +%s)"
-LOG_DIR_LATEST="/home/rack/qc_logs_latest"
+LOG_DIR="/home/rack/qc_logs/$(date +%s)"
+LOG_DIR_LATEST="/home/rack/qc_logs/latest"
 mkdir -p "${LOG_DIR}"
-ln -sf "${LOG_DIR}" "${LOG_DIR_LATEST}"
+ln -fsn "${LOG_DIR}" "${LOG_DIR_LATEST}"
 
 # List of all valid functions. If you want it to be executed, it need to be here.
 # Order matters if you are passing multiple command line options
