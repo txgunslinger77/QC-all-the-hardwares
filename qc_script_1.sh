@@ -295,12 +295,14 @@ dell_om_install () {
 	# Give OpenManage services chance to start
 	sleep 35
 
+	echo ###############################################################################
 	echo "Enabling Hyperthreading..."
+	echo ###############################################################################
 	# Enable the HT in the BIOS
 	"${OMCONFIG_BIN}" chassis biossetup attribute=cpuht setting=enabled
 
 	# TODO: Check if node is R710 and don't run; This causes the script to FAIL
-	echo ###############################################################################	
+	echo ###############################################################################
 	echo "Enabling PerfOptimized to prevent phantom load issue"
 	echo "This will fail on R710 nodes, it is safe to ignore"
 	echo ###############################################################################
@@ -378,7 +380,7 @@ for function in "${current_functions[@]}"; do
 	if [[ "${func_val}" -eq 1 ]]; then
 		# The craziness here allows us to break the function if a
 		# command fails without breaking the whole script
-		(set -e && eval ${function} 2>&1 > "${LOG_DIR}/${function}.log")
+		(set -e && eval ${function} 2>&1) > "${LOG_DIR}/${function}.log"
 		exit_status=$?
 		set +e
 		error_check "$exit_status" "${function} has failed. Please check the logs at ${LOG_DIR}/${function}.log"
