@@ -40,6 +40,22 @@ where OPTIONS := {
 EOF
 }
 
+error_check () {
+        exit_status=$1
+        message=$2
+
+        if [[ $exit_status -ne 0 ]]; then
+                echo "RBA START STATUS:"
+                echo "FAIL"
+                echo "RBA END STATUS:"
+                echo "RBA START DATA:"
+                echo "$message"
+                echo "RBA END DATA:"
+
+                exit 1
+        fi
+}
+
 bdf_sort () {
 	# This sorts by using some sed magic. It view groups as lines with
 	# breaks in between them. It uses "vertical tabs" to allow sorting.
@@ -196,7 +212,7 @@ modules () {
 	modprobe ixgbe || echo "ixgbe module failed to load"
 }
 
-sol () { 
+serial () { 
 	# Create file to configure console serial redirection over DRAC
 	# (this will allow access to DRAC from your terminal session window)
 
@@ -283,7 +299,7 @@ dell_om_install () {
 	# Enable the HT in the BIOS
 	"${OMCONFIG_BIN}" chassis biossetup attribute=cpuht setting=enabled
 
-	# TODO: Check if node is R710 and don't run
+	# TODO: Check if node is R710 and don't run; This causes the script to FAIL
 	echo ###############################################################################	
 	echo "Enabling PerfOptimized to prevent phantom load issue"
 	echo "This will fail on R710 nodes, it is safe to ignore"
@@ -328,7 +344,7 @@ while getopts ":dkmnorsth" opt; do
 		lvm_resize=1
 		;;
 	s)
-		sol=1
+		serial=1
 		;;
 	t)
 		tools_install=1
@@ -345,18 +361,32 @@ while getopts ":dkmnorsth" opt; do
 	esac
 done
 
-LOG_DIR="/home/rack/qc_logs"
+# Setting up the directory used for logging
+LOG_DIR="/home/rack/qc_logs_$(date +%s)"
+LOG_DIR_LATEST="/home/rack/qc_logs_latest"
 mkdir -p "${LOG_DIR}"
+ln -sf "${LOG_DIR}" "${LOG_DIR_LATEST}"
 
-#[[ "${networking}" -eq 1 ]] && networking
-[[ "${lvm_resize}" -eq 1 ]] && lvm_resize 2>&1 > "${LOG_DIR}/lvm.log"
-[[ "${modules}" -eq 1 ]] && modules 2>&1 > "${LOG_DIR}/modules.log"
-[[ "${dell_om_install}" -eq 1 ]] && dell_om_install 2>&1 > "${LOG_DIR}/dell_openmanage.log"
-[[ "${sol}" -eq 1 ]] && sol 2>&1 > "${LOG_DIR}/serial.log"
-[[ "${kernel_update}" -eq 1 ]] && kernel_update 2>&1 > "${LOG_DIR}/kernel_update.log"
-[[ "${distro_update}" -eq 1 ]] && distro_update 2>&1 > "${LOG_DIR}/distro_update.log"
-[[ "${tools_install}" -eq 1 ]] && tools_install 2>&1 > "${LOG_DIR}/system_tools.log"
+# List of all valid functions. If you want it to be executed, it need to be here.
+# Order matters if you are passing multiple command line options
+current_functions=(lvm_resize modules dell_om_install serial kernel_update distro_update tools_install)
 
-[[ "${restart}" -eq 1 ]] && restart_node
+# This will loop through the functions and execute them
+# Unless logging is broken, this section should probably not been modified.
+for function in "${current_functions[@]}"; do
+	eval func_val=\$$function
+	if [[ "${func_val}" -eq 1 ]]; then
+		# The craziness here allows us to break the function if a
+		# command fails without breaking the whole script
+		(set -e && eval ${function} 2>&1 > "${LOG_DIR}/${function}.log")
+		exit_status=$?
+		set +e
+		error_check "$exit_status" "${function} has failed. Please check the logs at ${LOG_DIR}/${function}.log"
+	fi
+done
 
-exit
+echo "RBA START STATUS:"
+echo "PASS"
+echo "RBA END STATUS:"
+
+exit 0
