@@ -176,6 +176,8 @@ lvm_resize () {
 	else
 		echo "Swap is not resizing"
 	fi
+
+	return 0
 }
 
 modules () {
@@ -210,6 +212,8 @@ modules () {
 	modprobe bonding || echo "bonding module failed to load"
 	modprobe e1000e || echo "e1000e module failed to load"
 	modprobe ixgbe || echo "ixgbe module failed to load"
+
+	return 0
 }
 
 serial () { 
@@ -253,6 +257,8 @@ EOF
 	"${RACADM_BIN}" config -g cfgSerial -o cfgSerialConsoleEnable 1
 	"${RACADM_BIN}" config -g cfgSerial -o cfgSerialSshEnable 1
 	"${RACADM_BIN}" config -g cfgSerial -o cfgSerialHistorySize 2000
+
+	return 0
 }
  
 kernel_update () {
@@ -262,6 +268,8 @@ kernel_update () {
 	echo "Attempting to install newer kernel..."
 	apt-get update
 	apt-get install -y --install-recommends linux-generic-lts-raring
+
+	exit 0
 }
 
 distro_update () {
@@ -270,6 +278,8 @@ distro_update () {
 	echo "Installing any Distro upgrades that are available"
 	apt-get update
 	apt-get -y dist-upgrade
+
+	exit 0
 }
 
 tools_install () {
@@ -278,6 +288,8 @@ tools_install () {
 	apt-get update
 	apt-get install -y dsh curl ethtool ifenslave vim sysstat linux-crashdump
 	sed -i 's/ENABLED=\"false\"/ENABLED=\"true\"/' /etc/default/sysstat
+
+	exit 0
 }
 
 dell_om_install () {
@@ -312,6 +324,8 @@ dell_om_install () {
 	"${OMCONFIG_BIN}" chassis biossetup attribute=SysProfile \
 							setting=PerfOptimized
 	sleep 10
+
+	exit 0
 }
 
 restart_node () {
